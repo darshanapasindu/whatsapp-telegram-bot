@@ -1,0 +1,36 @@
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
+const TelegramBot = require('node-telegram-bot-api');
+const axios = require('axios');
+
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+
+const client = new Client({
+  authStrategy: new LocalAuth()
+});
+
+client.on('qr', qr => {
+  qrcode.generate(qr, { small: true });
+});
+
+client.on('ready', () => {
+  console.log('✅ WhatsApp bot is ready!');
+});
+
+client.initialize();
+
+bot.on('video', async (msg) => {
+  const fileId = msg.video.file_id;
+  const file = await bot.getFile(fileId);
+  const url = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${file.file_path}`;
+
+  const response = await axios.get(url, { responseType: 'arraybuffer' });
+  const videoBuffer = Buffer.from(response.data, 'binary');
+
+  const groupId = process.env.WHATSAPP_GROUP_ID;
+
+  client.sendMessage(groupId, videoBuffer, { sendMediaAsDocument: false })
+    .then(() => console.log("📤 Sent video to WhatsApp"))
+    .catch(err => console.error("❌ Error:", err));
+});
